@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("home loads and sniffs hex PDF header", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("banner").getByText("FileSniff")).toBeVisible();
-  await page.getByRole("button", { name: /Hex/i }).click();
+  await page.getByRole("tab", { name: /Hex/i }).click();
   await page.getByPlaceholder(/hex/i).fill("25 50 44 46 2D 31");
   await page.getByRole("button", { name: /Sniff bytes/i }).click();
   await expect(page.getByRole("heading", { name: "PDF" })).toBeVisible({ timeout: 10000 });
