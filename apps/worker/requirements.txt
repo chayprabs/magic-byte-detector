@@ -2,5 +2,5 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 python-multipart>=0.0.12
 httpx>=0.28.0
-oletools>=0.60.0
+oletools>=0.60.2
 # ssdeep: optional; install in Docker image or `apt install libfuzzy-dev && pip install ssdeep`
