@@ -40,7 +40,8 @@ jobs:
         run: cd packages/web && pnpm exec playwright install chromium
 
       - name: E2E tests
-        run: pnpm --filter @filesniff/web run test:e2e
+        working-directory: packages/web
+        run: pnpm run test:e2e
 
       - name: Bundle size check
         run: |
