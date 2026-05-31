@@ -1,0 +1,21 @@
+{
+  "name": "magic-byte-detector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Detect file types from magic bytes online - MIME mismatch, ambiguity, container sniffing and risk flags.",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "test:e2e": "pnpm --filter @filesniff/web run test:e2e",
+    "dev": "pnpm --filter @filesniff/web run dev",
+    "dev:worker": "cd apps/worker && uvicorn app.main:app --reload --host 0.0.0.0 --port 8787"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

@@ -1,0 +1,92 @@
+import type { FormatFamily } from "./types.js";
+
+export interface Signature {
+  id: string;
+  format: string;
+  mime: string;
+  family: FormatFamily;
+  /** Hex pattern with ?? wildcards, space-separated */
+  pattern: string;
+  offset?: number;
+  extensions?: string[];
+  container?: string;
+}
+
+/** Curated magic-byte table (libmagic-aligned); augments WASM when present */
+export const SIGNATURES: Signature[] = [
+  { id: "pdf", format: "PDF", mime: "application/pdf", family: "document", pattern: "25 50 44 46", extensions: ["pdf"] },
+  { id: "zip", format: "ZIP", mime: "application/zip", family: "archive", pattern: "50 4B 03 04", extensions: ["zip", "jar", "docx", "xlsx", "pptx", "epub", "odt", "apk", "ipa"] },
+  { id: "zip_empty", format: "ZIP", mime: "application/zip", family: "archive", pattern: "50 4B 05 06", extensions: ["zip"] },
+  { id: "zip_spanned", format: "ZIP", mime: "application/zip", family: "archive", pattern: "50 4B 07 08", extensions: ["zip"] },
+  { id: "gzip", format: "GZIP", mime: "application/gzip", family: "archive", pattern: "1F 8B 08", extensions: ["gz", "tgz"] },
+  { id: "bz2", format: "BZIP2", mime: "application/x-bzip2", family: "archive", pattern: "42 5A 68", extensions: ["bz2"] },
+  { id: "xz", format: "XZ", mime: "application/x-xz", family: "archive", pattern: "FD 37 7A 58 5A 00", extensions: ["xz"] },
+  { id: "7z", format: "7-Zip", mime: "application/x-7z-compressed", family: "archive", pattern: "37 7A BC AF 27 1C", extensions: ["7z"] },
+  { id: "rar", format: "RAR", mime: "application/vnd.rar", family: "archive", pattern: "52 61 72 21 1A 07", extensions: ["rar"] },
+  { id: "tar", format: "TAR", mime: "application/x-tar", family: "archive", pattern: "75 73 74 61 72", offset: 257, extensions: ["tar"] },
+  { id: "png", format: "PNG", mime: "image/png", family: "image", pattern: "89 50 4E 47 0D 0A 1A 0A", extensions: ["png"] },
+  { id: "jpg", format: "JPEG", mime: "image/jpeg", family: "image", pattern: "FF D8 FF", extensions: ["jpg", "jpeg"] },
+  { id: "gif", format: "GIF", mime: "image/gif", family: "image", pattern: "47 49 46 38", extensions: ["gif"] },
+  { id: "webp", format: "WebP", mime: "image/webp", family: "image", pattern: "52 49 46 46 ?? ?? ?? ?? 57 45 42 50", extensions: ["webp"] },
+  { id: "bmp", format: "BMP", mime: "image/bmp", family: "image", pattern: "42 4D", extensions: ["bmp"] },
+  { id: "ico", format: "ICO", mime: "image/x-icon", family: "image", pattern: "00 00 01 00", extensions: ["ico"] },
+  { id: "tiff_le", format: "TIFF", mime: "image/tiff", family: "image", pattern: "49 49 2A 00", extensions: ["tif", "tiff"] },
+  { id: "tiff_be", format: "TIFF", mime: "image/tiff", family: "image", pattern: "4D 4D 00 2A", extensions: ["tif", "tiff"] },
+  { id: "mp3_id3", format: "MP3", mime: "audio/mpeg", family: "audio", pattern: "49 44 33", extensions: ["mp3"] },
+  { id: "mp3_sync", format: "MP3", mime: "audio/mpeg", family: "audio", pattern: "FF FB", extensions: ["mp3"] },
+  { id: "wav", format: "WAV", mime: "audio/wav", family: "audio", pattern: "52 49 46 46 ?? ?? ?? ?? 57 41 56 45", extensions: ["wav"] },
+  { id: "ogg", format: "OGG", mime: "audio/ogg", family: "audio", pattern: "4F 67 67 53", extensions: ["ogg", "oga"] },
+  { id: "flac", format: "FLAC", mime: "audio/flac", family: "audio", pattern: "66 4C 61 43", extensions: ["flac"] },
+  { id: "mp4", format: "MP4", mime: "video/mp4", family: "video", pattern: "00 00 00 ?? 66 74 79 70", offset: 4, extensions: ["mp4", "m4a", "m4v"] },
+  { id: "mkv", format: "Matroska", mime: "video/x-matroska", family: "video", pattern: "1A 45 DF A3", extensions: ["mkv", "webm"] },
+  { id: "avi", format: "AVI", mime: "video/x-msvideo", family: "video", pattern: "52 49 46 46 ?? ?? ?? ?? 41 56 49 20", extensions: ["avi"] },
+  { id: "wmv", format: "WMV", mime: "video/x-ms-wmv", family: "video", pattern: "30 26 B2 75 8E 66 CF 11", extensions: ["wmv", "asf"] },
+  { id: "exe_mz", format: "PE/EXE", mime: "application/x-msdownload", family: "executable", pattern: "4D 5A", extensions: ["exe", "dll", "scr"] },
+  { id: "elf", format: "ELF", mime: "application/x-elf", family: "executable", pattern: "7F 45 4C 46", extensions: ["elf", "so"] },
+  { id: "mach_o", format: "Mach-O", mime: "application/x-mach-binary", family: "executable", pattern: "FE ED FA CE", extensions: [] },
+  { id: "mach_o64", format: "Mach-O 64", mime: "application/x-mach-binary", family: "executable", pattern: "FE ED FA CF", extensions: [] },
+  { id: "wasm", format: "WebAssembly", mime: "application/wasm", family: "executable", pattern: "00 61 73 6D", extensions: ["wasm"] },
+  { id: "doc_ole", format: "OLE/CFB", mime: "application/x-ole-storage", family: "office", pattern: "D0 CF 11 E0 A1 B1 1A E1", extensions: ["doc", "xls", "ppt", "msi"] },
+  { id: "rtf", format: "RTF", mime: "application/rtf", family: "document", pattern: "7B 5C 72 74 66", extensions: ["rtf"] },
+  { id: "html", format: "HTML", mime: "text/html", family: "text", pattern: "3C 21 44 4F 43 54 59 50 45", extensions: ["html", "htm"] },
+  { id: "html_alt", format: "HTML", mime: "text/html", family: "text", pattern: "3C 68 74 6D 6C", extensions: ["html"] },
+  { id: "xml", format: "XML", mime: "application/xml", family: "text", pattern: "3C 3F 78 6D 6C", extensions: ["xml"] },
+  { id: "json", format: "JSON", mime: "application/json", family: "text", pattern: "7B", extensions: ["json"] },
+  { id: "sqlite", format: "SQLite", mime: "application/x-sqlite3", family: "document", pattern: "53 51 4C 69 74 65 20 66 6F 72 6D 61 74", extensions: ["sqlite", "db"] },
+  { id: "woff", format: "WOFF", mime: "font/woff", family: "font", pattern: "77 4F 46 46", extensions: ["woff"] },
+  { id: "woff2", format: "WOFF2", mime: "font/woff2", family: "font", pattern: "77 4F 46 32", extensions: ["woff2"] },
+  { id: "ttf", format: "TrueType", mime: "font/ttf", family: "font", pattern: "00 01 00 00", extensions: ["ttf"] },
+  { id: "otf", format: "OpenType", mime: "font/otf", family: "font", pattern: "4F 54 54 4F", extensions: ["otf"] },
+  { id: "ps", format: "PostScript", mime: "application/postscript", family: "document", pattern: "25 21", extensions: ["ps", "eps"] },
+  { id: "swf", format: "SWF", mime: "application/x-shockwave-flash", family: "executable", pattern: "46 57 53", extensions: ["swf"] },
+  { id: "swf_c", format: "SWF compressed", mime: "application/x-shockwave-flash", family: "executable", pattern: "43 57 53", extensions: ["swf"] },
+  { id: "class", format: "Java class", mime: "application/java-vm", family: "executable", pattern: "CA FE BA BE", extensions: ["class"] },
+  { id: "dmg", format: "Apple Disk Image", mime: "application/x-apple-diskimage", family: "archive", pattern: "78 01 73 0D 62 62 60", extensions: ["dmg"] },
+  { id: "iso", format: "ISO 9660", mime: "application/x-iso9660-image", family: "archive", pattern: "43 44 30 30 31", offset: 32769, extensions: ["iso"] },
+  { id: "deb", format: "Debian package", mime: "application/vnd.debian.binary-package", family: "archive", pattern: "21 3C 61 72 63 68 3E", extensions: ["deb"] },
+  { id: "rpm", format: "RPM", mime: "application/x-rpm", family: "archive", pattern: "ED AB EE DB", extensions: ["rpm"] },
+  { id: "cab", format: "CAB", mime: "application/vnd.ms-cab-compressed", family: "archive", pattern: "4D 53 43 46", extensions: ["cab"] },
+  { id: "pcap", format: "PCAP", mime: "application/vnd.tcpdump.pcap", family: "document", pattern: "D4 C3 B2 A1", extensions: ["pcap"] },
+  { id: "pcapng", format: "PCAP-NG", mime: "application/vnd.tcpdump.pcap", family: "document", pattern: "0A 0D 0D 0A", extensions: ["pcapng"] },
+  { id: "der", format: "DER certificate", mime: "application/x-x509-ca-cert", family: "document", pattern: "30 82", extensions: ["der", "cer"] },
+  { id: "pem", format: "PEM", mime: "application/x-pem-file", family: "text", pattern: "2D 2D 2D 2D 2D", extensions: ["pem", "crt"] },
+  { id: "ics", format: "iCalendar", mime: "text/calendar", family: "text", pattern: "42 45 47 49 4E 3A 56 43 41 4C 45 4E 44 41 52", extensions: ["ics"] },
+  { id: "vcard", format: "vCard", mime: "text/vcard", family: "text", pattern: "42 45 47 49 4E 3A 56 43 41 52 44", extensions: ["vcf"] },
+  { id: "wasm_alt", format: "WebAssembly", mime: "application/wasm", family: "executable", pattern: "00 61 73 6D 01 00 00 00", extensions: ["wasm"] },
+  { id: "zstd", format: "Zstandard", mime: "application/zstd", family: "archive", pattern: "28 B5 2F FD", extensions: ["zst"] },
+  { id: "lz4", format: "LZ4", mime: "application/x-lz4", family: "archive", pattern: "04 22 4D 18", extensions: ["lz4"] },
+  { id: "lzma", format: "LZMA alone", mime: "application/x-lzma", family: "archive", pattern: "5D 00 00", extensions: ["lzma"] },
+  { id: "cpio", format: "CPIO", mime: "application/x-cpio", family: "archive", pattern: "30 37 30 37 30", extensions: ["cpio"] },
+  { id: "ar", format: "AR archive", mime: "application/x-archive", family: "archive", pattern: "21 3C 61 72 63 68 3E", extensions: ["a"] },
+  { id: "mobi", format: "Mobipocket", mime: "application/x-mobipocket-ebook", family: "document", pattern: "4D 4F 42 49", extensions: ["mobi"] },
+  { id: "epub_alt", format: "EPUB (ZIP)", mime: "application/epub+zip", family: "document", pattern: "50 4B 03 04", extensions: ["epub"], container: "EPUB" },
+  { id: "blend", format: "Blender", mime: "application/x-blender", family: "document", pattern: "42 4C 45 4E 44 45 52", extensions: ["blend"] },
+  { id: "psd", format: "Photoshop", mime: "image/vnd.adobe.photoshop", family: "image", pattern: "38 42 50 53", extensions: ["psd"] },
+  { id: "midi", format: "MIDI", mime: "audio/midi", family: "audio", pattern: "4D 54 68 64", extensions: ["mid", "midi"] },
+  { id: "amr", format: "AMR", mime: "audio/amr", family: "audio", pattern: "23 21 41 4D 52", extensions: ["amr"] },
+  { id: "3gp", format: "3GPP", mime: "video/3gpp", family: "video", pattern: "00 00 00 ?? 66 74 79 70 33 67", offset: 4, extensions: ["3gp"] },
+  { id: "heic", format: "HEIC", mime: "image/heic", family: "image", pattern: "00 00 00 ?? 66 74 79 70 68 65 69 63", offset: 4, extensions: ["heic", "heif"] },
+  { id: "avif", format: "AVIF", mime: "image/avif", family: "image", pattern: "00 00 00 ?? 66 74 79 70 61 76 69 66", offset: 4, extensions: ["avif"] },
+  { id: "dcm", format: "DICOM", mime: "application/dicom", family: "document", pattern: "44 49 43 4D", offset: 128, extensions: ["dcm"] },
+  { id: "wasm_wat", format: "WAT", mime: "text/wat", family: "text", pattern: "28 6D 6F 64 75 6C 65", extensions: ["wat"] },
+];
