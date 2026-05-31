@@ -13,6 +13,8 @@ export function BatchPanel() {
   const onBatch = async (file: File) => {
     setLoading(true);
     setError(null);
+    setReport(null);
+    setCount(0);
     try {
       const api = WORKER_URL || "/api";
       const form = new FormData();

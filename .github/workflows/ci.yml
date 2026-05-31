@@ -68,9 +68,12 @@ jobs:
           pip install setuptools
           pip install -r apps/worker/requirements.txt
 
-      - name: Worker import test
+      - name: Worker tests
         working-directory: apps/worker
-        run: python -c "from app.main import app; assert app.title"
+        run: |
+          pip install pytest
+          python -c "from app.main import app; assert app.title"
+          python -m pytest tests/test_response.py -q
 
       - name: Validate compose
         run: docker compose config

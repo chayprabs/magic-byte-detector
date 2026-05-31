@@ -225,6 +225,14 @@ def _container(data: bytes) -> str | None:
     return "ZIP container"
 
 
+def _drop_none(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _drop_none(v) for k, v in obj.items() if v is not None}
+    if isinstance(obj, list):
+        return [_drop_none(v) for v in obj]
+    return obj
+
+
 def _build_result(
     data: bytes,
     filename: str | None = None,
@@ -246,20 +254,28 @@ def _build_result(
     container = _container(data)
     strong = len(det["alternatives"]) >= 1 and det["primary"]["confidence"] >= 0.5
     retention = int(os.environ.get("RETENTION_MINUTES", "5"))
-    return {
+    ssdeep_val = _ssdeep(data)
+    hashes: dict[str, str] = {"sha256": _sha256(data)}
+    if ssdeep_val:
+        hashes["ssdeep"] = ssdeep_val
+    enc = _encoding(data)
+    payload: dict[str, Any] = {
         **det,
         "extensionMismatch": extension_mismatch,
         "mimeMismatch": mime_mismatch,
         "ambiguity": strong or "polyglot" in risk,
-        "container": container,
         "riskFlags": risk,
-        "hashes": {"sha256": _sha256(data), "ssdeep": _ssdeep(data)},
+        "hashes": hashes,
         "routingHints": _routing_hints(det["primary"], container, risk),
-        "encoding": _encoding(data),
         "bytesRead": len(data),
         "privacyMode": False,
         "retentionPolicy": f"Ephemeral; deleted within {retention} minutes",
     }
+    if container:
+        payload["container"] = container
+    if enc:
+        payload["encoding"] = enc
+    return _drop_none(payload)
 
 
 @app.get("/health")

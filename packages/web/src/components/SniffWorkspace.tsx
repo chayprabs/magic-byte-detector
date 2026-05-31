@@ -10,9 +10,11 @@ type InputMode = "file" | "hex" | "url" | "batch";
 
 type LastInput =
   | { kind: "file"; file: File }
-  | { kind: "bytes"; bytes: Uint8Array; name?: string; claimedMime?: string };
+  | { kind: "bytes"; bytes: Uint8Array; name?: string; claimedMime?: string }
+  | { kind: "remote" };
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? "";
+const MAX_HEX_CHARS = 120_000;
 
 export function SniffWorkspace() {
   const [mode, setMode] = useState<InputMode>("file");
@@ -24,12 +26,14 @@ export function SniffWorkspace() {
   const [result, setResult] = useState<SniffResult | null>(null);
   const [filename, setFilename] = useState<string | undefined>();
   const [headerBytes, setHeaderBytes] = useState<Uint8Array | undefined>();
-  const [lastFile, setLastFile] = useState<File | null>(null);
   const lastInputRef = useRef<LastInput | null>(null);
+  const [inputKind, setInputKind] = useState<"none" | "file" | "bytes" | "remote">("none");
+  const sniffGenRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const runSniff = useCallback(
     async (bytes: Uint8Array, name?: string, claimedMime?: string) => {
+      const gen = ++sniffGenRef.current;
       setLoading(true);
       setError(null);
       setHeaderBytes(bytes.subarray(0, Math.min(bytes.length, 128)));
@@ -40,21 +44,23 @@ export function SniffWorkspace() {
           privacyMode,
           maxBytes: privacyMode ? 4096 : undefined,
         });
+        if (gen !== sniffGenRef.current) return;
         setResult(r);
         setFilename(name);
       } catch (e) {
+        if (gen !== sniffGenRef.current) return;
         setError(e instanceof Error ? e.message : "Sniff failed");
         setResult(null);
       } finally {
-        setLoading(false);
+        if (gen === sniffGenRef.current) setLoading(false);
       }
     },
     [privacyMode],
   );
 
   const onFile = async (file: File) => {
-    setLastFile(file);
     lastInputRef.current = { kind: "file", file };
+    setInputKind("file");
     setFilename(file.name);
     if (fileRef.current) fileRef.current.value = "";
     const slice = privacyMode ? file.slice(0, 4096) : file;
@@ -64,7 +70,7 @@ export function SniffWorkspace() {
 
   useEffect(() => {
     const last = lastInputRef.current;
-    if (!last) return;
+    if (!last || last.kind === "remote") return;
     if (last.kind === "file") {
       void (async () => {
         const slice = privacyMode ? last.file.slice(0, 4096) : last.file;
@@ -105,9 +111,14 @@ export function SniffWorkspace() {
   };
 
   const onHexSubmit = async () => {
+    if (hexText.length > MAX_HEX_CHARS) {
+      setError(`Hex input too large (max ${MAX_HEX_CHARS} characters)`);
+      return;
+    }
     try {
       const bytes = parseInputBytes(hexText);
       lastInputRef.current = { kind: "bytes", bytes };
+      setInputKind("bytes");
       await runSniff(bytes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid hex or base64");
@@ -116,6 +127,7 @@ export function SniffWorkspace() {
 
   const onUrlSubmit = async () => {
     if (!urlText.trim()) return;
+    const gen = ++sniffGenRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -127,44 +139,59 @@ export function SniffWorkspace() {
       });
       await ensureOk(res);
       const data = (await res.json()) as SniffResult;
+      if (gen !== sniffGenRef.current) return;
+      lastInputRef.current = { kind: "remote" };
+      setInputKind("remote");
+      setHeaderBytes(undefined);
       setResult(data);
+      setFilename(urlText.trim().split("/").pop() || "download");
     } catch (e) {
+      if (gen !== sniffGenRef.current) return;
       setError(
         e instanceof Error
           ? `${e.message} — start worker: docker compose up`
           : "URL scan failed",
       );
     } finally {
-      setLoading(false);
+      if (gen === sniffGenRef.current) setLoading(false);
     }
   };
 
-  const onFullScan = async (file?: File) => {
-    const f = file ?? lastFile;
-    if (!f) return;
+  const onFullScan = async () => {
+    const last = lastInputRef.current;
+    if (last?.kind !== "file") return;
+    const gen = ++sniffGenRef.current;
     setLoading(true);
     setError(null);
     try {
       const api = WORKER_URL || "/api";
       const form = new FormData();
-      form.append("file", f);
+      form.append("file", last.file);
       const res = await fetch(`${api}/v1/scan`, { method: "POST", body: form });
       await ensureOk(res);
       const data = (await res.json()) as SniffResult;
+      if (gen !== sniffGenRef.current) return;
+      lastInputRef.current = { kind: "remote" };
+      setInputKind("remote");
+      setHeaderBytes(undefined);
       setResult(data);
-      setFilename(f.name);
+      setFilename(last.file.name);
     } catch (e) {
+      if (gen !== sniffGenRef.current) return;
       setError(e instanceof Error ? e.message : "Full scan unavailable — docker compose up");
     } finally {
-      setLoading(false);
+      if (gen === sniffGenRef.current) setLoading(false);
     }
   };
 
   const onSample = (bytes: Uint8Array, name: string) => {
     setMode("file");
     lastInputRef.current = { kind: "bytes", bytes, name };
+    setInputKind("bytes");
     void runSniff(bytes, name);
   };
+
+  const canFullScan = inputKind === "file";
 
   return (
     <div className="space-y-6">
@@ -236,11 +263,11 @@ export function SniffWorkspace() {
             >
               Choose file
             </button>
-            {lastFile && (
+            {canFullScan && (
               <button
                 type="button"
                 className="px-4 py-2.5 border border-neutral-300 rounded-lg text-sm hover:border-accent/40"
-                onClick={() => void onFullScan(lastFile)}
+                onClick={() => void onFullScan()}
               >
                 Full server scan (ssdeep)
               </button>
