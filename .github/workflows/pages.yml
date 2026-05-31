@@ -1,8 +1,8 @@
 name: Deploy Pages
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+  # Enable GitHub Pages in repo Settings → Pages → Source: GitHub Actions, then run this workflow.
 
 permissions:
   contents: read
