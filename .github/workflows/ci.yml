@@ -64,7 +64,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install worker deps
-        run: pip install -r apps/worker/requirements.txt
+        run: |
+          pip install setuptools
+          pip install -r apps/worker/requirements.txt
 
       - name: Worker import test
         working-directory: apps/worker
