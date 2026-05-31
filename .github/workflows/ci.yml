@@ -73,5 +73,5 @@ jobs:
       - name: Validate compose
         run: docker compose config
 
-      - name: Build compose images
-        run: pnpm run compose:build && docker compose build worker
+      - name: Build worker image
+        run: docker compose build worker
