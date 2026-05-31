@@ -77,7 +77,7 @@ export const SIGNATURES: Signature[] = [
   { id: "lz4", format: "LZ4", mime: "application/x-lz4", family: "archive", pattern: "04 22 4D 18", extensions: ["lz4"] },
   { id: "lzma", format: "LZMA alone", mime: "application/x-lzma", family: "archive", pattern: "5D 00 00", extensions: ["lzma"] },
   { id: "cpio", format: "CPIO", mime: "application/x-cpio", family: "archive", pattern: "30 37 30 37 30", extensions: ["cpio"] },
-  { id: "ar", format: "AR archive", mime: "application/x-archive", family: "archive", pattern: "21 3C 61 72 63 68 3E", extensions: ["a"] },
+  { id: "ar", format: "AR archive", mime: "application/x-archive", family: "archive", pattern: "21 3C 61 72 63 68 3E 0A", extensions: ["a"] },
   { id: "mobi", format: "Mobipocket", mime: "application/x-mobipocket-ebook", family: "document", pattern: "4D 4F 42 49", extensions: ["mobi"] },
   { id: "epub_alt", format: "EPUB (ZIP)", mime: "application/epub+zip", family: "document", pattern: "50 4B 03 04", extensions: ["epub"], container: "EPUB" },
   { id: "blend", format: "Blender", mime: "application/x-blender", family: "document", pattern: "42 4C 45 4E 44 45 52", extensions: ["blend"] },

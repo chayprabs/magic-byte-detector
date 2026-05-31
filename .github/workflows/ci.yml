@@ -24,6 +24,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile || pnpm install
 
+      - name: Sync corpus manifest
+        run: node scripts/sync-corpus-manifest.mjs
+
       - name: Build core
         run: pnpm --filter @filesniff/core run build
 
@@ -69,3 +72,6 @@ jobs:
 
       - name: Validate compose
         run: docker compose config
+
+      - name: Build compose images
+        run: pnpm run compose:build && docker compose build worker

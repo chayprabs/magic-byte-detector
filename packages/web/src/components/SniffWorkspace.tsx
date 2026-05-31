@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sniff, parseHexInput, parseBase64Input, type SniffResult } from "@filesniff/core";
 import { ResultCard } from "./ResultCard";
-import { Upload, FileSearch, Link2, Shield } from "lucide-react";
+import { SamplePicker } from "./SamplePicker";
+import { BatchPanel } from "./BatchPanel";
+import { Upload, FileSearch, Link2, Shield, Archive } from "lucide-react";
 
-type InputMode = "file" | "hex" | "url";
+type InputMode = "file" | "hex" | "url" | "batch";
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? "";
 
@@ -16,6 +18,7 @@ export function SniffWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SniffResult | null>(null);
   const [filename, setFilename] = useState<string | undefined>();
+  const [headerBytes, setHeaderBytes] = useState<Uint8Array | undefined>();
   const [lastFile, setLastFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -23,6 +26,7 @@ export function SniffWorkspace() {
     async (bytes: Uint8Array, name?: string, claimedMime?: string) => {
       setLoading(true);
       setError(null);
+      setHeaderBytes(bytes.subarray(0, Math.min(bytes.length, 128)));
       try {
         const r = await sniff(bytes, {
           filename: name,
@@ -98,10 +102,11 @@ export function SniffWorkspace() {
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as SniffResult;
       setResult(data);
+      setHeaderBytes(undefined);
     } catch (e) {
       setError(
         e instanceof Error
-          ? `${e.message} — enable worker or use file/hex mode for local-only sniff.`
+          ? `${e.message} — start worker: docker compose up`
           : "URL scan failed",
       );
     } finally {
@@ -109,34 +114,42 @@ export function SniffWorkspace() {
     }
   };
 
-  const onFullScan = async (file: File) => {
-    if (!file) return;
+  const onFullScan = async (file?: File) => {
+    const f = file ?? lastFile;
+    if (!f) return;
     setLoading(true);
     setError(null);
     try {
       const api = WORKER_URL || "/api";
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", f);
       const res = await fetch(`${api}/v1/scan`, { method: "POST", body: form });
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as SniffResult;
       setResult(data);
-      setFilename(file.name);
+      setFilename(f.name);
+      setHeaderBytes(undefined);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Full scan unavailable");
+      setError(e instanceof Error ? e.message : "Full scan unavailable — docker compose up");
     } finally {
       setLoading(false);
     }
   };
 
+  const onSample = (bytes: Uint8Array, name: string) => {
+    setMode("file");
+    void runSniff(bytes, name);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 justify-center">
+      <div className="flex flex-wrap gap-2 justify-center" role="tablist">
         {(
           [
             ["file", "File", Upload],
             ["hex", "Hex / Base64", FileSearch],
             ["url", "URL", Link2],
+            ["batch", "Batch ZIP", Archive],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -157,16 +170,20 @@ export function SniffWorkspace() {
         ))}
       </div>
 
-      <label className="flex items-center justify-center gap-2 text-sm text-muted cursor-pointer">
-        <input
-          type="checkbox"
-          checked={privacyMode}
-          onChange={(e) => setPrivacyMode(e.target.checked)}
-          className="rounded border-neutral-300"
-        />
-        <Shield className="w-4 h-4" />
-        100% in-browser (first 4 KB only, no upload)
-      </label>
+      <SamplePicker onSample={onSample} />
+
+      {mode !== "batch" && (
+        <label className="flex items-center justify-center gap-2 text-sm text-muted cursor-pointer">
+          <input
+            type="checkbox"
+            checked={privacyMode}
+            onChange={(e) => setPrivacyMode(e.target.checked)}
+            className="rounded border-neutral-300"
+          />
+          <Shield className="w-4 h-4" />
+          100% in-browser (first 4 KB only, no upload)
+        </label>
+      )}
 
       {mode === "file" && (
         <div
@@ -190,28 +207,30 @@ export function SniffWorkspace() {
             }}
           />
           <p className="text-muted mb-4">Drop a file here or click to browse</p>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              fileRef.current?.click();
-            }}
-            className="px-6 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Choose file
-          </button>
-          {!privacyMode && fileRef.current?.files?.[0] && (
+          <div className="flex flex-wrap justify-center gap-2">
             <button
               type="button"
-              className="ml-3 px-4 py-2 border border-neutral-300 rounded-lg text-sm"
-              onClick={() => {
-                const f = fileRef.current?.files?.[0];
-                if (f) void onFullScan(f);
+              onClick={(e) => {
+                e.stopPropagation();
+                fileRef.current?.click();
               }}
+              className="px-6 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
-              Full server scan
+              Choose file
             </button>
-          )}
+            {lastFile && (
+              <button
+                type="button"
+                className="px-4 py-2.5 border border-neutral-300 rounded-lg text-sm hover:border-accent/40"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void onFullScan(lastFile);
+                }}
+              >
+                Full server scan (ssdeep)
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -255,13 +274,21 @@ export function SniffWorkspace() {
         </div>
       )}
 
-      {loading && <p className="text-center text-sm text-muted">Analyzing…</p>}
+      {mode === "batch" && <BatchPanel />}
+
+      {loading && (
+        <p className="text-center text-sm text-muted" aria-busy="true">
+          Analyzing…
+        </p>
+      )}
       {error && (
         <p className="text-center text-sm text-danger bg-red-50 border border-red-100 rounded-lg p-3" role="alert">
           {error}
         </p>
       )}
-      {result && <ResultCard result={result} filename={filename} />}
+      {result && mode !== "batch" && (
+        <ResultCard result={result} filename={filename} headerBytes={headerBytes} />
+      )}
     </div>
   );
 }

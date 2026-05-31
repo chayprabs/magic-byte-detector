@@ -24,18 +24,40 @@ pnpm --filter @filesniff/core run build
 pnpm dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 — drop a file, paste hex, or try a **sample** button.
 
-### Worker (optional)
+### Full stack (web + worker)
+
+```bash
+pnpm run compose:up
+```
+
+Open http://localhost:8080 (nginx serves the SPA and proxies `/api` to the worker).
+
+### Worker only
 
 ```bash
 pip install -r apps/worker/requirements.txt
 cd apps/worker && uvicorn app.main:app --port 8787
-# or
-docker compose up
 ```
 
-Set `VITE_WORKER_URL=http://localhost:8787` for full scan and URL modes.
+Set `VITE_WORKER_URL=http://localhost:8787` at build time for full scan, URL fetch, and batch ZIP on a static host.
+
+## PRD coverage
+
+| Requirement | Status |
+|-------------|--------|
+| F1 File / hex / URL modes | Done |
+| F2 Magic-byte detection + confidence | Done (curated libmagic-aligned table) |
+| F3 Extension & MIME mismatch | Done |
+| F4 Container sniff (ZIP/Office/APK/EPUB/tar) | Done |
+| F5 Risk flags (macro, EXE, polyglot, bomb, entropy) | Done |
+| F6 Routing hints | Done |
+| F7 SHA-256 + ssdeep (worker) | Done |
+| F8 Batch ZIP → CSV (worker) | Done |
+| F9 Privacy 4 KB toggle | Done |
+
+See [docs/QC_REPORT.md](docs/QC_REPORT.md) for the Section 25 qualification checklist.
 
 ## Monorepo layout
 

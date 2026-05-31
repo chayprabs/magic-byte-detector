@@ -11,7 +11,10 @@
     "test": "pnpm --filter @filesniff/core run test && pnpm --filter @filesniff/web run test",
     "test:e2e": "pnpm --filter @filesniff/web run test:e2e",
     "dev": "pnpm --filter @filesniff/web run dev",
-    "dev:worker": "cd apps/worker && uvicorn app.main:app --reload --host 0.0.0.0 --port 8787"
+    "dev:worker": "cd apps/worker && uvicorn app.main:app --reload --host 0.0.0.0 --port 8787",
+    "compose:build": "pnpm --filter @filesniff/core run build && pnpm --filter @filesniff/web run build",
+    "compose:up": "pnpm run compose:build && docker compose up --build -d",
+    "corpus:sync": "node scripts/sync-corpus-manifest.mjs"
   },
   "engines": {
     "node": ">=22",

@@ -142,6 +142,45 @@ def _entropy(chunk: bytes) -> float:
     return ent
 
 
+def _routing_hints(primary: dict[str, Any], container: str | None, risk: list[str]) -> list[dict[str, str]]:
+    hints: list[dict[str, str]] = []
+    fam = primary.get("family", "")
+    fmt = primary.get("format", "")
+    if fam == "archive" or "ZIP" in fmt or container:
+        hints.append({"tool": "ArchiveVet", "reason": "Inspect archive contents"})
+    if fam == "image":
+        hints.append({"tool": "ExifScrub", "reason": "Review image metadata"})
+    if "PDF" in fmt:
+        hints.append({"tool": "PdfForms", "reason": "Analyze PDF structure"})
+    if container and "EPUB" in container:
+        hints.append({"tool": "EpubDoctor", "reason": "Validate EPUB package"})
+    if fam == "font":
+        hints.append({"tool": "FontOps", "reason": "Font conversion tools"})
+    if "office_macro" in risk:
+        hints.append({"tool": "Macro deep scan", "reason": "VBA streams detected"})
+    return hints
+
+
+def _macro_deep(data: bytes, filename: str | None) -> bool:
+    """Optional oletools macro inspection."""
+    try:
+        import io
+        import tempfile
+
+        from oletools import olevba
+
+        suffix = Path(filename or "upload.bin").suffix or ".bin"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+            tmp.write(data)
+            tmp.flush()
+            vbaparser = olevba.VBA_Parser(tmp.name, data=io.BytesIO(data))
+            if vbaparser.detect_vba_macros():
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def _container(data: bytes) -> str | None:
     text = data[:8192].decode("latin-1", errors="ignore").lower()
     if not data.startswith(b"PK\x03\x04"):
@@ -173,18 +212,23 @@ def _build_result(
         and claimed != "application/octet-stream"
     )
     risk = _risk_flags(data, det["primary"]["format"])
+    if _macro_deep(data, filename) and "office_macro" not in risk:
+        risk.append("office_macro")
+    container = _container(data)
     strong = len(det["alternatives"]) >= 1 and det["primary"]["confidence"] >= 0.5
+    retention = int(os.environ.get("RETENTION_MINUTES", "5"))
     return {
         **det,
         "extensionMismatch": extension_mismatch,
         "mimeMismatch": mime_mismatch,
         "ambiguity": strong or "polyglot" in risk,
-        "container": _container(data),
+        "container": container,
         "riskFlags": risk,
         "hashes": {"sha256": _sha256(data), "ssdeep": _ssdeep(data)},
-        "routingHints": [],
+        "routingHints": _routing_hints(det["primary"], container, risk),
         "bytesRead": len(data),
         "privacyMode": False,
+        "retentionPolicy": f"Ephemeral; deleted within {retention} minutes",
     }
 
 
