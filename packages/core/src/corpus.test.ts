@@ -49,12 +49,8 @@ describe("fixture corpus", () => {
   }
 
   it("flags polyglot fixture", async () => {
-    try {
-      const bytes = new Uint8Array(readFileSync(join(corpusDir, "polyglot-pdf-zip.bin")));
-      const r = await sniff(bytes);
-      expect(r.ambiguity || r.riskFlags.includes("polyglot")).toBe(true);
-    } catch {
-      expect(true).toBe(true);
-    }
+    const bytes = new Uint8Array(readFileSync(join(corpusDir, "polyglot-pdf-zip.bin")));
+    const r = await sniff(bytes);
+    expect(r.ambiguity || r.riskFlags.includes("polyglot")).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sniff, parseHexInput, parseBase64Input, type SniffResult } from "@filesniff/core";
 import { ResultCard } from "./ResultCard";
 import { Upload, FileSearch, Link2, Shield } from "lucide-react";
@@ -16,6 +16,7 @@ export function SniffWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SniffResult | null>(null);
   const [filename, setFilename] = useState<string | undefined>();
+  const [lastFile, setLastFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const runSniff = useCallback(
@@ -42,11 +43,20 @@ export function SniffWorkspace() {
   );
 
   const onFile = async (file: File) => {
+    setLastFile(file);
     setFilename(file.name);
+    if (fileRef.current) fileRef.current.value = "";
     const slice = privacyMode ? file.slice(0, 4096) : file;
     const buf = await slice.arrayBuffer();
     await runSniff(new Uint8Array(buf), file.name, file.type || undefined);
   };
+
+  useEffect(() => {
+    if (lastFile && mode === "file") {
+      void onFile(lastFile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privacyMode]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -54,13 +64,21 @@ export function SniffWorkspace() {
     if (f) void onFile(f);
   };
 
+  const parseInputBytes = (raw: string): Uint8Array => {
+    const trimmed = raw.trim();
+    const hexLike = /^[0-9a-fA-Fx\s]+$/.test(trimmed) && /[0-9a-fA-F]{2}/.test(trimmed);
+    if (hexLike && (trimmed.includes(" ") || trimmed.length % 2 === 0)) {
+      return parseHexInput(trimmed);
+    }
+    if (/^[A-Za-z0-9+/=\s]+$/.test(trimmed) && trimmed.length >= 4) {
+      return parseBase64Input(trimmed);
+    }
+    return parseHexInput(trimmed);
+  };
+
   const onHexSubmit = async () => {
     try {
-      const trimmed = hexText.trim();
-      const bytes = trimmed.match(/^[A-Za-z0-9+/=\s]+$/) && !trimmed.includes(" ")
-        ? parseBase64Input(trimmed)
-        : parseHexInput(trimmed);
-      await runSniff(bytes);
+      await runSniff(parseInputBytes(hexText));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid hex or base64");
     }
@@ -124,6 +142,8 @@ export function SniffWorkspace() {
           <button
             key={id}
             type="button"
+            role="tab"
+            aria-selected={mode === id}
             onClick={() => setMode(id)}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm border transition-colors ${
               mode === id
@@ -150,9 +170,15 @@ export function SniffWorkspace() {
 
       {mode === "file" && (
         <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") fileRef.current?.click();
+          }}
+          onClick={() => fileRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          className="border-2 border-dashed border-neutral-300 rounded-xl bg-white p-10 text-center hover:border-accent/50 transition-colors"
+          className="border-2 border-dashed border-neutral-300 rounded-xl bg-white p-10 text-center hover:border-accent/50 transition-colors cursor-pointer"
         >
           <input
             ref={fileRef}
@@ -166,7 +192,10 @@ export function SniffWorkspace() {
           <p className="text-muted mb-4">Drop a file here or click to browse</p>
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
+            onClick={(e) => {
+              e.stopPropagation();
+              fileRef.current?.click();
+            }}
             className="px-6 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
             Choose file

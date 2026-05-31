@@ -51,7 +51,7 @@ export const SIGNATURES: Signature[] = [
   { id: "html", format: "HTML", mime: "text/html", family: "text", pattern: "3C 21 44 4F 43 54 59 50 45", extensions: ["html", "htm"] },
   { id: "html_alt", format: "HTML", mime: "text/html", family: "text", pattern: "3C 68 74 6D 6C", extensions: ["html"] },
   { id: "xml", format: "XML", mime: "application/xml", family: "text", pattern: "3C 3F 78 6D 6C", extensions: ["xml"] },
-  { id: "json", format: "JSON", mime: "application/json", family: "text", pattern: "7B", extensions: ["json"] },
+  { id: "json", format: "JSON", mime: "application/json", family: "text", pattern: "7B 22", extensions: ["json"] },
   { id: "sqlite", format: "SQLite", mime: "application/x-sqlite3", family: "document", pattern: "53 51 4C 69 74 65 20 66 6F 72 6D 61 74", extensions: ["sqlite", "db"] },
   { id: "woff", format: "WOFF", mime: "font/woff", family: "font", pattern: "77 4F 46 46", extensions: ["woff"] },
   { id: "woff2", format: "WOFF2", mime: "font/woff2", family: "font", pattern: "77 4F 46 32", extensions: ["woff2"] },

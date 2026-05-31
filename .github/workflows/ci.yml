@@ -36,6 +36,12 @@ jobs:
       - name: Build web
         run: pnpm --filter @filesniff/web run build
 
+      - name: Install Playwright
+        run: cd packages/web && pnpm exec playwright install chromium
+
+      - name: E2E tests
+        run: pnpm --filter @filesniff/web run test:e2e
+
       - name: Bundle size check
         run: |
           GZ=$(gzip -c packages/web/dist/assets/*.js 2>/dev/null | wc -c || echo 0)

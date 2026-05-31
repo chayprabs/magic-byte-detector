@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   webServer: {
-    command: "pnpm run preview -- --port 4173",
+    command: "pnpm run preview -- --host 0.0.0.0 --port 4173",
     port: 4173,
     reuseExistingServer: !process.env.CI,
   },

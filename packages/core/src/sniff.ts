@@ -17,13 +17,30 @@ function scoreMatch(sig: Signature, bytes: Uint8Array): number {
   return Math.min(0.99, confidence);
 }
 
+const SLIDING_SIGS = ["zip", "pdf", "exe_mz"] as const;
+
 function findMatches(bytes: Uint8Array): { sig: Signature; confidence: number }[] {
   const matches: { sig: Signature; confidence: number }[] = [];
   for (const sig of SIGNATURES) {
     const c = scoreMatch(sig, bytes);
     if (c > 0) matches.push({ sig, confidence: c });
+    if (SLIDING_SIGS.includes(sig.id as (typeof SLIDING_SIGS)[number]) && (sig.offset ?? 0) === 0) {
+      const parts = sig.pattern.split(/\s+/).length;
+      const scanMax = Math.min(bytes.length - parts, 64);
+      for (let off = 1; off <= scanMax; off++) {
+        if (matchPattern(bytes, sig.pattern, off)) {
+          const slideConf = Math.min(0.85, 0.45 + parts / 40);
+          if (!matches.some((m) => m.sig.id === sig.id && Math.abs(m.confidence - slideConf) < 0.01)) {
+            matches.push({ sig, confidence: slideConf });
+          }
+        }
+      }
+    }
   }
-  matches.sort((a, b) => b.confidence - a.confidence);
+  matches.sort((a, b) => {
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    return b.sig.pattern.split(/\s+/).length - a.sig.pattern.split(/\s+/).length;
+  });
   return matches;
 }
 
@@ -76,7 +93,9 @@ export async function sniff(
   if (primary.format === "ZIP" || primary.mime === "application/zip") {
     container = sniffZipContainer(bytes) ?? container;
   }
-  if (sniffTarball(bytes)) container = "POSIX tar archive";
+  if (primary.format === "TAR" || (primary.format !== "ZIP" && sniffTarball(bytes))) {
+    container = "POSIX tar archive";
+  }
 
   const wrapper = sniffCompressionWrapper(bytes);
   if (wrapper && !container) container = wrapper;
@@ -86,10 +105,11 @@ export async function sniff(
   const extensionMismatch =
     !!ext && expectedExts.length > 0 && !expectedExts.includes(ext);
 
+  const claimed = options.claimedMime?.split(";")[0]?.trim().toLowerCase();
   const mimeMismatch =
-    !!options.claimedMime &&
-    options.claimedMime !== primary.mime &&
-    !options.claimedMime.includes("octet-stream");
+    !!claimed &&
+    claimed !== primary.mime &&
+    claimed !== "application/octet-stream";
 
   const alternatives = matches.slice(1, 5).map((m) => ({
     mime: m.sig.mime,
@@ -97,7 +117,10 @@ export async function sniff(
     confidence: m.confidence,
   }));
 
-  const ambiguity = matches.filter((m) => m.confidence >= 0.5).length >= 2;
+  const strongFamilies = new Set(
+    matches.filter((m) => m.confidence >= 0.45).map((m) => m.sig.family),
+  );
+  const ambiguity = strongFamilies.size >= 2 || matches.filter((m) => m.confidence >= 0.5).length >= 2;
   const riskFlags = detectRiskFlags(bytes, matches.filter((m) => m.confidence >= 0.45).length, primary.format, container);
   const encoding = detectTextEncoding(bytes);
 

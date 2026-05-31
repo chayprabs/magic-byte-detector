@@ -2,7 +2,7 @@ import type { RiskFlag } from "./types.js";
 import { entropy } from "./hash.js";
 import { matchPattern } from "./hex.js";
 
-const VBA_MARKERS = ["_vba_project", "vba", "macros", "attribut", "projectwm"];
+const VBA_MARKERS = ["_vba_project", "vba6", "vba7", "macrosheet", "attribut", "projectwm"];
 const PE_PATTERN = "4D 5A";
 
 export function detectRiskFlags(
@@ -38,13 +38,9 @@ export function detectRiskFlags(
 }
 
 function detectArchiveBomb(bytes: Uint8Array): boolean {
-  if (bytes.length < 6) return false;
-  if (bytes[0] === 0x1f && bytes[1] === 0x8b && bytes.length < 512) {
-    return true;
-  }
-  if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b && bytes.length >= 4096) {
     const ratio = bytes.length / Math.max(1, countPrintable(bytes));
-    if (bytes.length > 4096 && ratio > 50) return true;
+    if (ratio > 50) return true;
   }
   return false;
 }

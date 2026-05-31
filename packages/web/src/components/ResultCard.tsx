@@ -118,6 +118,7 @@ export function ResultCard({ result, filename }: Props) {
         </span>
         <button
           type="button"
+          aria-label="Copy JSON"
           onClick={() => void copyJson()}
           className="inline-flex items-center gap-1 hover:text-ink"
         >
