@@ -6,13 +6,30 @@ export function bytesToHex(bytes: Uint8Array, max = 64): string {
 }
 
 export function parseHexInput(input: string): Uint8Array {
-  const cleaned = input.replace(/0x/gi, "").replace(/[^0-9a-fA-F]/g, "");
+  const stripped = input.trim();
+  const spaced = stripped.split(/\s+/).filter(Boolean).map((p) => p.replace(/^0x/i, ""));
+  let cleaned: string;
+  if (spaced.length > 1) {
+    for (const part of spaced) {
+      if (!/^[0-9a-fA-F]{2}$/.test(part)) {
+        throw new Error(`Invalid hex byte: ${part}`);
+      }
+    }
+    cleaned = spaced.join("");
+  } else {
+    const noSpace = stripped.replace(/0x/gi, "").replace(/\s/g, "");
+    if (!/^[0-9a-fA-F]*$/.test(noSpace)) {
+      throw new Error("Invalid hex characters in input");
+    }
+    cleaned = noSpace;
+  }
   if (cleaned.length % 2 !== 0) {
     throw new Error("Hex input must have an even number of nibbles");
   }
   const out = new Uint8Array(cleaned.length / 2);
   for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
+    const pair = cleaned.slice(i * 2, i * 2 + 2);
+    out[i] = parseInt(pair, 16);
   }
   return out;
 }

@@ -21,9 +21,13 @@ const SLIDING_SIGS = ["zip", "pdf", "exe_mz"] as const;
 
 function findMatches(bytes: Uint8Array): { sig: Signature; confidence: number }[] {
   const matches: { sig: Signature; confidence: number }[] = [];
+  const seenIds = new Set<string>();
   for (const sig of SIGNATURES) {
     const c = scoreMatch(sig, bytes);
-    if (c > 0) matches.push({ sig, confidence: c });
+    if (c > 0 && !seenIds.has(sig.id)) {
+      seenIds.add(sig.id);
+      matches.push({ sig, confidence: c });
+    }
     if (SLIDING_SIGS.includes(sig.id as (typeof SLIDING_SIGS)[number]) && (sig.offset ?? 0) === 0) {
       const parts = sig.pattern.split(/\s+/).length;
       const scanMax = Math.min(bytes.length - parts, 64);
@@ -111,17 +115,25 @@ export async function sniff(
     claimed !== primary.mime &&
     claimed !== "application/octet-stream";
 
-  const alternatives = matches.slice(1, 5).map((m) => ({
-    mime: m.sig.mime,
-    format: m.sig.format,
-    confidence: m.confidence,
-  }));
+  const seenAlt = new Set<string>();
+  const alternatives = matches
+    .slice(1)
+    .filter((m) => {
+      if (seenAlt.has(m.sig.format)) return false;
+      seenAlt.add(m.sig.format);
+      return true;
+    })
+    .slice(0, 4)
+    .map((m) => ({
+      mime: m.sig.mime,
+      format: m.sig.format,
+      confidence: m.confidence,
+    }));
 
-  const strongFamilies = new Set(
-    matches.filter((m) => m.confidence >= 0.45).map((m) => m.sig.family),
-  );
-  const ambiguity = strongFamilies.size >= 2 || matches.filter((m) => m.confidence >= 0.5).length >= 2;
-  const riskFlags = detectRiskFlags(bytes, matches.filter((m) => m.confidence >= 0.45).length, primary.format, container);
+  const strong = matches.filter((m) => m.confidence >= 0.45);
+  const strongFamilies = new Set(strong.map((m) => m.sig.family));
+  const ambiguity = strongFamilies.size >= 2;
+  const riskFlags = detectRiskFlags(bytes, strongFamilies.size, primary.format, container);
   const encoding = detectTextEncoding(bytes);
 
   const hashInput = privacyMode ? bytes : bytes;

@@ -3,8 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 
-// Regression: empty API bodies must still surface role="alert" (see BUG-1)
-test.fail("full server scan shows alert when API returns 500 with empty body", async ({ page }) => {
+test("full server scan shows alert when API returns 500 with empty body", async ({ page }) => {
   await page.route("**/api/v1/scan", (route) =>
     route.fulfill({ status: 500, body: "" }),
   );
@@ -21,7 +20,7 @@ test.fail("full server scan shows alert when API returns 500 with empty body", a
   await expect(page.getByRole("alert")).not.toBeEmpty();
 });
 
-test.fail("batch upload shows alert when API returns 500 with empty body", async ({ page }) => {
+test("batch upload shows alert when API returns 500 with empty body", async ({ page }) => {
   await page.route("**/api/v1/batch", (route) =>
     route.fulfill({ status: 500, body: "" }),
   );

@@ -3,9 +3,14 @@ import { sniff, parseHexInput, parseBase64Input, type SniffResult } from "@files
 import { ResultCard } from "./ResultCard";
 import { SamplePicker } from "./SamplePicker";
 import { BatchPanel } from "./BatchPanel";
+import { ensureOk } from "../lib/api";
 import { Upload, FileSearch, Link2, Shield, Archive } from "lucide-react";
 
 type InputMode = "file" | "hex" | "url" | "batch";
+
+type LastInput =
+  | { kind: "file"; file: File }
+  | { kind: "bytes"; bytes: Uint8Array; name?: string; claimedMime?: string };
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? "";
 
@@ -20,6 +25,7 @@ export function SniffWorkspace() {
   const [filename, setFilename] = useState<string | undefined>();
   const [headerBytes, setHeaderBytes] = useState<Uint8Array | undefined>();
   const [lastFile, setLastFile] = useState<File | null>(null);
+  const lastInputRef = useRef<LastInput | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const runSniff = useCallback(
@@ -48,6 +54,7 @@ export function SniffWorkspace() {
 
   const onFile = async (file: File) => {
     setLastFile(file);
+    lastInputRef.current = { kind: "file", file };
     setFilename(file.name);
     if (fileRef.current) fileRef.current.value = "";
     const slice = privacyMode ? file.slice(0, 4096) : file;
@@ -56,11 +63,18 @@ export function SniffWorkspace() {
   };
 
   useEffect(() => {
-    if (lastFile && mode === "file") {
-      void onFile(lastFile);
+    const last = lastInputRef.current;
+    if (!last) return;
+    if (last.kind === "file") {
+      void (async () => {
+        const slice = privacyMode ? last.file.slice(0, 4096) : last.file;
+        const buf = await slice.arrayBuffer();
+        await runSniff(new Uint8Array(buf), last.file.name, last.file.type || undefined);
+      })();
+    } else {
+      void runSniff(last.bytes, last.name, last.claimedMime);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [privacyMode]);
+  }, [privacyMode, runSniff]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -70,11 +84,21 @@ export function SniffWorkspace() {
 
   const parseInputBytes = (raw: string): Uint8Array => {
     const trimmed = raw.trim();
-    const hexLike = /^[0-9a-fA-Fx\s]+$/.test(trimmed) && /[0-9a-fA-F]{2}/.test(trimmed);
-    if (hexLike && (trimmed.includes(" ") || trimmed.length % 2 === 0)) {
+    const is0xHex = /(?:^|\s)0x[0-9a-fA-F]{2}(?:\s|$)/i.test(trimmed);
+    const isSpacedHex =
+      trimmed.includes(" ") && /^[0-9a-fA-F\s]+$/i.test(trimmed.replace(/\s0x/gi, " "));
+    if (is0xHex || isSpacedHex) {
       return parseHexInput(trimmed);
     }
-    if (/^[A-Za-z0-9+/=\s]+$/.test(trimmed) && trimmed.length >= 4) {
+    const compact = trimmed.replace(/\s/g, "");
+    const hexOnly = /^[0-9a-fA-F]+$/.test(compact) && compact.length % 2 === 0;
+    if (hexOnly && !compact.includes("=")) {
+      return parseHexInput(trimmed);
+    }
+    const looksBase64 =
+      /^[A-Za-z0-9+/]+=*$/.test(compact) &&
+      (compact.includes("=") || (compact.length >= 8 && compact.length % 4 === 0));
+    if (looksBase64) {
       return parseBase64Input(trimmed);
     }
     return parseHexInput(trimmed);
@@ -82,7 +106,9 @@ export function SniffWorkspace() {
 
   const onHexSubmit = async () => {
     try {
-      await runSniff(parseInputBytes(hexText));
+      const bytes = parseInputBytes(hexText);
+      lastInputRef.current = { kind: "bytes", bytes };
+      await runSniff(bytes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid hex or base64");
     }
@@ -99,10 +125,9 @@ export function SniffWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: urlText.trim() }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      await ensureOk(res);
       const data = (await res.json()) as SniffResult;
       setResult(data);
-      setHeaderBytes(undefined);
     } catch (e) {
       setError(
         e instanceof Error
@@ -124,11 +149,10 @@ export function SniffWorkspace() {
       const form = new FormData();
       form.append("file", f);
       const res = await fetch(`${api}/v1/scan`, { method: "POST", body: form });
-      if (!res.ok) throw new Error(await res.text());
+      await ensureOk(res);
       const data = (await res.json()) as SniffResult;
       setResult(data);
       setFilename(f.name);
-      setHeaderBytes(undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Full scan unavailable — docker compose up");
     } finally {
@@ -138,6 +162,7 @@ export function SniffWorkspace() {
 
   const onSample = (bytes: Uint8Array, name: string) => {
     setMode("file");
+    lastInputRef.current = { kind: "bytes", bytes, name };
     void runSniff(bytes, name);
   };
 
@@ -186,34 +211,27 @@ export function SniffWorkspace() {
       )}
 
       {mode === "file" && (
-        <div
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") fileRef.current?.click();
-          }}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          className="border-2 border-dashed border-neutral-300 rounded-xl bg-white p-10 text-center hover:border-accent/50 transition-colors cursor-pointer"
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onFile(f);
-            }}
-          />
-          <p className="text-muted mb-4">Drop a file here or click to browse</p>
+        <>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            className="border-2 border-dashed border-neutral-300 rounded-xl bg-white p-10 text-center"
+          >
+            <p className="text-muted mb-4">Drop a file here</p>
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onFile(f);
+              }}
+            />
+          </div>
           <div className="flex flex-wrap justify-center gap-2">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                fileRef.current?.click();
-              }}
+              onClick={() => fileRef.current?.click()}
               className="px-6 py-2.5 bg-accent text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               Choose file
@@ -222,16 +240,13 @@ export function SniffWorkspace() {
               <button
                 type="button"
                 className="px-4 py-2.5 border border-neutral-300 rounded-lg text-sm hover:border-accent/40"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void onFullScan(lastFile);
-                }}
+                onClick={() => void onFullScan(lastFile)}
               >
                 Full server scan (ssdeep)
               </button>
             )}
           </div>
-        </div>
+        </>
       )}
 
       {mode === "hex" && (

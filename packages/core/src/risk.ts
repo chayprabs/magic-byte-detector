@@ -7,21 +7,22 @@ const PE_PATTERN = "4D 5A";
 
 export function detectRiskFlags(
   bytes: Uint8Array,
-  matchCount: number,
+  distinctFamilies: number,
   format: string,
   container?: string,
 ): RiskFlag[] {
   const flags: RiskFlag[] = [];
   const lower = new TextDecoder("latin1", { fatal: false }).decode(bytes).toLowerCase();
 
-  if (matchCount >= 2) flags.push("polyglot");
+  if (distinctFamilies >= 2) flags.push("polyglot");
 
   if (format.includes("OLE") || container?.includes("Word") || container?.includes("Excel")) {
     if (VBA_MARKERS.some((m) => lower.includes(m))) flags.push("office_macro");
   }
 
   if (bytes.length > 4) {
-    for (let i = 4; i < Math.min(bytes.length - 2, 65536); i++) {
+    const limit = Math.min(bytes.length - 1, 65536);
+    for (let i = 4; i < limit; i++) {
       if (matchPattern(bytes.subarray(i), PE_PATTERN)) {
         flags.push("embedded_exe");
         break;
@@ -30,7 +31,9 @@ export function detectRiskFlags(
   }
 
   const ent = entropy(bytes);
-  if (ent > 7.5) flags.push("high_entropy");
+  const isPdf = format.includes("PDF") || bytes[0] === 0x25;
+  if (ent > 7.9 && !isPdf) flags.push("high_entropy");
+  else if (ent > 7.5 && !isPdf && bytes.length < 512) flags.push("high_entropy");
 
   if (detectArchiveBomb(bytes)) flags.push("archive_bomb");
 

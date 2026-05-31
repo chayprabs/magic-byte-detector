@@ -45,6 +45,11 @@ export function ResultCard({ result, filename, headerBytes }: Props) {
     URL.revokeObjectURL(a.href);
   };
 
+  const esc = (v: string) => {
+    if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+    return v;
+  };
+
   const downloadCsv = () => {
     const row = [
       filename ?? "",
@@ -55,8 +60,12 @@ export function ResultCard({ result, filename, headerBytes }: Props) {
       result.hashes.sha256,
       result.riskFlags.join(";"),
       String(result.extensionMismatch),
+      String(result.mimeMismatch),
     ];
-    const csv = ["filename,format,mime,family,confidence,sha256,risk_flags,extension_mismatch", row.join(",")].join("\n");
+    const csv = [
+      "filename,format,mime,family,confidence,sha256,risk_flags,extension_mismatch,mime_mismatch",
+      row.map(esc).join(","),
+    ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
+import { ensureOk } from "../lib/api";
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? "";
 
@@ -17,7 +18,7 @@ export function BatchPanel() {
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`${api}/v1/batch`, { method: "POST", body: form });
-      if (!res.ok) throw new Error(await res.text());
+      await ensureOk(res);
       const data = (await res.json()) as { report: string; count: number };
       setReport(data.report);
       setCount(data.count);

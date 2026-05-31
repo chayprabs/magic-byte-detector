@@ -37,6 +37,7 @@ export interface SniffResult {
   routingHints: { tool: string; reason: string; url?: string }[];
   bytesRead: number;
   privacyMode: boolean;
+  retentionPolicy?: string;
 }
 
 export interface SniffOptions {

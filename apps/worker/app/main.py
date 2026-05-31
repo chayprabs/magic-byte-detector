@@ -84,6 +84,11 @@ def _validate_url(url: str) -> None:
         raise HTTPException(400, "URL host not allowed")
 
 
+def _match_at(data: bytes, magic: bytes, offset: int = 0) -> bool:
+    end = offset + len(magic)
+    return len(data) >= end and data[offset:end] == magic
+
+
 def _detect_magic(data: bytes) -> dict[str, Any]:
     primary = {
         "mime": "application/octet-stream",
@@ -93,14 +98,22 @@ def _detect_magic(data: bytes) -> dict[str, Any]:
     }
     alts: list[dict[str, Any]] = []
     ext_map: tuple[str, ...] = ()
+    seen_fmt: set[str] = set()
+    scan_window = min(len(data), 64)
+
     for magic, mime, fmt, fam, exts in SIGS:
-        if data.startswith(magic):
+        for offset in range(scan_window + 1):
+            if not _match_at(data, magic, offset):
+                continue
             match = {"mime": mime, "format": fmt, "family": fam, "confidence": 0.85}
             if primary["confidence"] < 0.5:
                 primary = match
                 ext_map = exts
-            else:
+                seen_fmt.add(fmt)
+            elif fmt not in seen_fmt:
                 alts.append({k: match[k] for k in ("mime", "format", "confidence")})
+                seen_fmt.add(fmt)
+            break
     return {"primary": primary, "alternatives": alts[:4], "extensions": ext_map}
 
 
@@ -116,7 +129,10 @@ def _risk_flags(data: bytes, primary_format: str) -> list[str]:
     if data[:4] == b"%PDF" and b"PK\x03\x04" in data[:64]:
         flags.append("polyglot")
     ent = _entropy(data[:4096])
-    if ent > 7.5:
+    is_pdf = primary_format.startswith("PDF") or data[:4] == b"%PDF"
+    if ent > 7.9 and not is_pdf:
+        flags.append("high_entropy")
+    elif ent > 7.5 and not is_pdf and len(data) < 512:
         flags.append("high_entropy")
     if data.startswith(b"PK\x03\x04") and len(data) >= 4096:
         printable = sum(1 for b in data if 0x20 <= b <= 0x7E)
@@ -181,6 +197,19 @@ def _macro_deep(data: bytes, filename: str | None) -> bool:
     return False
 
 
+def _encoding(data: bytes) -> str | None:
+    if len(data) >= 3 and data[0:3] == b"\xef\xbb\xbf":
+        return "utf-8 (BOM)"
+    if len(data) >= 2 and data[0:2] == b"\xff\xfe":
+        return "utf-16le"
+    if len(data) >= 2 and data[0:2] == b"\xfe\xff":
+        return "utf-16be"
+    sample = data[:256].decode("utf-8", errors="ignore")
+    if len(sample) > 8 and all(c in "\t\n\r" or 0x20 <= ord(c) <= 0x7E for c in sample):
+        return "ascii/utf-8 text"
+    return None
+
+
 def _container(data: bytes) -> str | None:
     text = data[:8192].decode("latin-1", errors="ignore").lower()
     if not data.startswith(b"PK\x03\x04"):
@@ -226,6 +255,7 @@ def _build_result(
         "riskFlags": risk,
         "hashes": {"sha256": _sha256(data), "ssdeep": _ssdeep(data)},
         "routingHints": _routing_hints(det["primary"], container, risk),
+        "encoding": _encoding(data),
         "bytesRead": len(data),
         "privacyMode": False,
         "retentionPolicy": f"Ephemeral; deleted within {retention} minutes",
@@ -249,11 +279,16 @@ async def scan_file(file: UploadFile = File(...)) -> dict[str, Any]:
 async def scan_url(body: UrlScanRequest) -> dict[str, Any]:
     url = str(body.url)
     _validate_url(url)
-    async with httpx.AsyncClient(follow_redirects=False, timeout=30.0) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        data = resp.content
-        ctype = resp.headers.get("content-type", "")
+    try:
+        async with httpx.AsyncClient(follow_redirects=False, timeout=30.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.content
+            ctype = resp.headers.get("content-type", "")
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(502, f"Remote URL returned {exc.response.status_code}") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(400, f"Could not fetch URL: {exc}") from exc
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "Remote file too large")
     return _build_result(data, url.split("/")[-1] or "download", ctype)
@@ -269,7 +304,11 @@ async def batch_scan(file: UploadFile = File(...)) -> dict[str, Any]:
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "Archive too large")
     rows = []
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(400, "Invalid ZIP archive") from exc
+    with zf:
         for name in zf.namelist()[:100]:
             if name.endswith("/") or ".." in name or name.startswith("/"):
                 continue
@@ -287,10 +326,23 @@ async def batch_scan(file: UploadFile = File(...)) -> dict[str, Any]:
                     "mime": r["primary"]["mime"],
                     "sha256": r["hashes"]["sha256"],
                     "risk": ";".join(r["riskFlags"]),
+                    "extension_mismatch": str(r["extensionMismatch"]),
+                    "mime_mismatch": str(r["mimeMismatch"]),
                 }
             )
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=["name", "format", "mime", "sha256", "risk"])
+    writer = csv.DictWriter(
+        buf,
+        fieldnames=[
+            "name",
+            "format",
+            "mime",
+            "sha256",
+            "risk",
+            "extension_mismatch",
+            "mime_mismatch",
+        ],
+    )
     writer.writeheader()
     writer.writerows(rows)
     return {"report": buf.getvalue(), "count": len(rows)}

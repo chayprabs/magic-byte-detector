@@ -67,13 +67,13 @@ test.describe("SniffWorkspace", () => {
     await expect(page.getByText(/File: test\.pdf/i)).toBeVisible();
   });
 
-  test("file upload via drop zone click opens picker path", async ({ page }) => {
+  test("choose file button opens picker", async ({ page }) => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "filesniff-"));
     const filePath = path.join(tmp, "drop.pdf");
     fs.writeFileSync(filePath, Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]));
 
     const fileChooserPromise = page.waitForEvent("filechooser");
-    await page.getByText(/Drop a file here/i).click();
+    await page.getByRole("button", { name: "Choose file" }).click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(filePath);
     await expect(page.getByRole("heading", { name: "PDF" })).toBeVisible({ timeout: 10000 });
@@ -97,15 +97,14 @@ test.describe("SniffWorkspace", () => {
     await expect(page.getByText(/Read 4096 bytes/)).toBeVisible({ timeout: 10000 });
   });
 
-  test("privacy toggle does not re-sniff after sample click (known gap)", async ({ page }) => {
-    await page.getByRole("button", { name: "random.bin", exact: true }).click();
-    await expect(page.getByRole("article")).toBeVisible({ timeout: 10000 });
-    const shaBefore = await page.getByText(/SHA-256:/).textContent();
-
+  test("privacy toggle re-sniffs after hex paste", async ({ page }) => {
+    await page.getByRole("tab", { name: /Hex/i }).click();
+    const pairs = Array.from({ length: 5000 }, () => "ff").join(" ");
+    await page.getByPlaceholder(/hex/i).fill(pairs);
+    await page.getByRole("button", { name: /Sniff bytes/i }).click();
+    await expect(page.getByText(/Read 4096 bytes/)).toBeVisible({ timeout: 10000 });
     await page.getByRole("checkbox").uncheck();
-    await page.waitForTimeout(500);
-    const shaAfter = await page.getByText(/SHA-256:/).textContent();
-    expect(shaBefore).toBe(shaAfter);
+    await expect(page.getByText(/Read 5000 bytes/)).toBeVisible({ timeout: 10000 });
   });
 
   test("full server scan button appears after file upload", async ({ page }) => {
