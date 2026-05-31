@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { HomePage } from "./pages/HomePage";
 import { SeoLandingPage } from "./pages/SeoLandingPage";
+import { DisclaimerPage } from "./pages/DisclaimerPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
 
@@ -23,6 +24,7 @@ export default function App() {
         ))}
         <Route path="privacy" element={<PrivacyPage />} />
         <Route path="terms" element={<TermsPage />} />
+        <Route path="disclaimer" element={<DisclaimerPage />} />
       </Route>
     </Routes>
   );

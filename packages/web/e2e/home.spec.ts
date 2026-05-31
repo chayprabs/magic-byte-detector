@@ -9,13 +9,17 @@ test("home loads and sniffs hex PDF header", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "PDF" })).toBeVisible({ timeout: 10000 });
 });
 
-test("privacy and terms links work", async ({ page }) => {
+test("privacy, terms, and disclaimer links work", async ({ page }) => {
+  const legal = page.getByRole("navigation", { name: "Legal" });
   await page.goto("/");
-  await page.getByRole("link", { name: /Privacy/i }).click();
+  await legal.getByRole("link", { name: "Privacy Policy" }).click();
   await expect(page.getByRole("heading", { name: /Privacy Policy/i })).toBeVisible();
   await page.goto("/");
-  await page.getByRole("link", { name: /Terms/i }).click();
-  await expect(page.getByRole("heading", { name: /Terms/i })).toBeVisible();
+  await legal.getByRole("link", { name: "Terms & Conditions" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Terms & Conditions" })).toBeVisible();
+  await page.goto("/");
+  await legal.getByRole("link", { name: "Disclaimer" }).click();
+  await expect(page.getByRole("heading", { name: /Legal Disclaimer/i })).toBeVisible();
 });
 
 test("seo route loads", async ({ page }) => {

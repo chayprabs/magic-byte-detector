@@ -1,0 +1,28 @@
+FileSniff (magic-byte-detector)
+Copyright (c) 2026 Chaitanya Prabuddha
+
+## Open-source licenses
+
+| Component        | License    | File                    |
+|------------------|------------|-------------------------|
+| packages/core    | MIT        | LICENSE (repository root) |
+| packages/web     | MIT        | LICENSE (repository root) |
+| apps/worker      | AGPL-3.0   | apps/worker/LICENSE     |
+
+Redistribution and modification of the **source code** are governed by those licenses. The MIT and AGPL licenses disclaim warranties and limit liability for the **software** to the extent permitted by law.
+
+## Hosted website and API (separate from code license)
+
+Use of the **public hosted** FileSniff website, demo, and any operator-run worker API is **not** covered by the MIT/AGPL alone. It is governed by:
+
+- [docs/legal/TERMS.md](docs/legal/TERMS.md) — Terms & Conditions (liability cap, indemnification, governing law, etc.)
+- [docs/legal/PRIVACY.md](docs/legal/PRIVACY.md) — Privacy Policy
+- [docs/legal/DISCLAIMER.md](docs/legal/DISCLAIMER.md) — Legal disclaimer
+
+The same text is published in the web app at `/terms`, `/privacy`, and `/disclaimer`.
+
+If you **self-host** the application, you are responsible for providing your own terms, privacy notice, and compliance with laws in your jurisdiction. The AGPL-3.0 may impose additional obligations for network use of the worker.
+
+## No legal advice
+
+These documents are provided for transparency. **No policy or license can guarantee immunity from lawsuits in every country.** Enforceability of limitation-of-liability and indemnity clauses varies by jurisdiction. Consult a qualified attorney for your situation.

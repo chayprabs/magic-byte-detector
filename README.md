@@ -68,10 +68,23 @@ apps/worker/     FastAPI (AGPL-3.0) — ssdeep, URL, batch
 fixtures/        Test samples
 ```
 
+## Legal
+
+| Topic | Location |
+|-------|----------|
+| Terms (hosted site) | [docs/legal/TERMS.md](docs/legal/TERMS.md) · `/terms` |
+| Privacy | [docs/legal/PRIVACY.md](docs/legal/PRIVACY.md) · `/privacy` |
+| Disclaimer | [docs/legal/DISCLAIMER.md](docs/legal/DISCLAIMER.md) · `/disclaimer` |
+| Code vs service | [NOTICE](NOTICE) |
+
+The hosted Service includes disclaimers, a **USD $100** liability cap (where enforceable), indemnification, and governing law (India / Karnataka) as described in the Terms. Self-hosters must provide their own notices and comply with local law.
+
 ## License
 
-- `packages/*` — MIT
-- `apps/worker` — AGPL-3.0
+- `packages/*` — [MIT](LICENSE)
+- `apps/worker` — [AGPL-3.0](apps/worker/LICENSE)
+
+Hosted website use is additionally governed by the legal documents above (see [NOTICE](NOTICE)).
 
 ## Author
 
