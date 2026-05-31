@@ -27,19 +27,6 @@ export function parseBase64Input(input: string): Uint8Array {
   return out;
 }
 
-function hexPatternToRegex(pattern: string): RegExp {
-  const parts = pattern.trim().split(/\s+/);
-  let re = "";
-  for (const part of parts) {
-    if (part === "??") {
-      re += ".";
-    } else {
-      re += String.fromCharCode(parseInt(part, 16));
-    }
-  }
-  return new RegExp("^" + re.replace(/[.*+?^${}()|[\]\\]/g, (m) => `\\${m}`) + "", "s");
-}
-
 export function matchPattern(bytes: Uint8Array, pattern: string, offset = 0): boolean {
   const parts = pattern.trim().split(/\s+/);
   if (bytes.length < offset + parts.length) return false;

@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Build core
+        run: pnpm --filter @filesniff/core run build
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build web
+        run: pnpm --filter @filesniff/web run build
+
+      - name: Bundle size check
+        run: |
+          GZ=$(gzip -c packages/web/dist/assets/*.js 2>/dev/null | wc -c || echo 0)
+          echo "Main JS gzipped ~${GZ} bytes"
+          if [ "$GZ" -gt 819200 ]; then
+            echo "::warning::Bundle may exceed 800KB budget"
+          fi
+
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install worker deps
+        run: pip install -r apps/worker/requirements.txt
+
+      - name: Worker import test
+        working-directory: apps/worker
+        run: python -c "from app.main import app; assert app.title"
+
+      - name: Validate compose
+        run: docker compose config

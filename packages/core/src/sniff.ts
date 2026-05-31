@@ -99,7 +99,7 @@ export async function sniff(
 
   const ambiguity = matches.filter((m) => m.confidence >= 0.5).length >= 2;
   const riskFlags = detectRiskFlags(bytes, matches.filter((m) => m.confidence >= 0.45).length, primary.format, container);
-  const encoding = primary.family === "text" ? detectTextEncoding(bytes) : detectTextEncoding(bytes);
+  const encoding = detectTextEncoding(bytes);
 
   const hashInput = privacyMode ? bytes : bytes;
   const sha256 = await sha256Hex(hashInput);

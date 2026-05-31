@@ -1,3 +1,30 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+apps/worker/.venv/
+
+# Env
+.env
+.env.*
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Test / build artifacts
+playwright-report/
+test-results/
+coverage/
+
 # Local planning documents intentionally kept out of GitHub
 PRODUCT_REQUIREMENTS.md
 IMPLEMENTATION_HANDOFF.md

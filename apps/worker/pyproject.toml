@@ -1,0 +1,16 @@
+[project]
+name = "filesniff-worker"
+version = "1.0.0"
+description = "FileSniff API worker - full scan, ssdeep, Office macro inspection"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+  "python-multipart>=0.0.12",
+  "httpx>=0.28.0",
+  "ssdeep>=3.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "pytest-asyncio>=0.24.0"]
